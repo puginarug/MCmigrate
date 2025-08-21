@@ -15,8 +15,9 @@ class Simulation:
     
     def __init__(self, 
                  n_cells=30,
-                 stadium_width=40,
-                 stadium_height=100,
+                 stadium_L=60,
+                 stadium_R=20,
+                 source_length=40,
                  chemotaxis_strength=0.3,
                  repulsion_strength=0.2,
                  interaction_radius=10.0,
@@ -29,10 +30,12 @@ class Simulation:
         -----------
         n_cells : int
             Number of cells
-        stadium_width : float
-            Width of vertical stadium
-        stadium_height : float
-            Height of vertical stadium
+        stadium_L : float
+            Length of straight walls in stadium
+        stadium_R : float
+            Radius of semicircles
+        source_length : float
+            Length of vertical line source for gradient
         chemotaxis_strength : float
             Strength of chemotactic response (0-1)
         repulsion_strength : float
@@ -55,7 +58,8 @@ class Simulation:
         self.velocity_params = velocity_params
         
         # Initialize stadium
-        self.stadium = VerticalStadium(width=stadium_width, height=stadium_height)
+        self.stadium = VerticalStadium(L=stadium_L, R=stadium_R, 
+                                      center=(0, 0), source_length=source_length)
         
         # Initialize cells
         positions = self.stadium.sample_initial_positions(n_cells, distribution='bottom')

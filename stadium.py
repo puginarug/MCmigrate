@@ -5,54 +5,57 @@ Vertical stadium domain with gradient field
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
 
 
 class VerticalStadium:
-    """Vertical stadium-shaped domain with linear gradient."""
+    """Vertical stadium-shaped domain with line source gradient."""
     
-    def __init__(self, width=40, height=100, center=(0, 0)):
+    def __init__(self, L=60, R=20, center=(0, 0), source_length=40):
         """
         Initialize vertical stadium.
         
         Parameters:
         -----------
-        width : float
-            Width of the stadium (diameter of semicircles)
-        height : float
-            Total height of the stadium
+        L : float
+            Length of straight walls (vertical extent)
+        R : float
+            Radius of semicircles at top and bottom
         center : tuple
             (x, y) center position
+        source_length : float
+            Length of vertical line source for gradient
         """
-        self.width = width
-        self.height = height
+        self.L = L  # Length of straight walls
+        self.R = R  # Radius of semicircles
         self.center = center
-        self.radius = width / 2  # Radius of semicircles
-        self.rect_height = height - width  # Height of rectangular section
+        self.source_length = source_length
         
-        # Gradient parameters (simple linear gradient along y-axis)
+        # Total height = L + 2*R (straight part + two semicircles)
+        self.total_height = L + 2 * R
+        
+        # Gradient parameters
         self.gradient_strength = 1.0
+        self.gradient_decay = 0.05  # Decay rate from line source
         
     def is_inside(self, x, y):
         """Check if point (x, y) is inside the stadium."""
         cx, cy = self.center
         
-        # Check rectangular region
-        if (cx - self.radius <= x <= cx + self.radius) and \
-           (cy - self.rect_height/2 <= y <= cy + self.rect_height/2):
+        # Check if in straight wall region
+        if -self.R <= x <= self.R and -self.L/2 <= y <= self.L/2:
             return True
         
-        # Check bottom semicircle
-        if y < cy - self.rect_height/2:
-            dx = x - cx
-            dy = y - (cy - self.rect_height/2)
-            if dx**2 + dy**2 <= self.radius**2:
+        # Check top semicircle
+        if y > self.L/2:
+            dy = y - self.L/2
+            if x**2 + dy**2 <= self.R**2:
                 return True
         
-        # Check top semicircle
-        if y > cy + self.rect_height/2:
-            dx = x - cx
-            dy = y - (cy + self.rect_height/2)
-            if dx**2 + dy**2 <= self.radius**2:
+        # Check bottom semicircle
+        if y < -self.L/2:
+            dy = y + self.L/2
+            if x**2 + dy**2 <= self.R**2:
                 return True
         
         return False
@@ -70,8 +73,6 @@ class VerticalStadium:
         --------
         tuple : (x, y) constrained to be inside stadium
         """
-        cx, cy = self.center
-        
         # If inside, return as is
         if self.is_inside(x, y):
             return x, y
@@ -79,41 +80,42 @@ class VerticalStadium:
         # Find closest point on boundary
         # Check which section we're closest to
         
-        # Rectangular region bounds
-        if cy - self.rect_height/2 <= y <= cy + self.rect_height/2:
-            # Closest to left or right edge
-            if x < cx:
-                return cx - self.radius, y
+        # Straight wall region
+        if -self.L/2 <= y <= self.L/2:
+            # Closest to left or right wall
+            if x < 0:
+                return -self.R, y
             else:
-                return cx + self.radius, y
-        
-        # Bottom semicircle
-        elif y < cy - self.rect_height/2:
-            center_y = cy - self.rect_height/2
-            dx = x - cx
-            dy = y - center_y
-            dist = np.sqrt(dx**2 + dy**2)
-            if dist > 0:
-                # Project to circle boundary
-                return cx + dx/dist * self.radius, center_y + dy/dist * self.radius
-            else:
-                return cx, center_y - self.radius
+                return self.R, y
         
         # Top semicircle
-        else:
-            center_y = cy + self.rect_height/2
-            dx = x - cx
+        elif y > self.L/2:
+            center_y = self.L/2
             dy = y - center_y
-            dist = np.sqrt(dx**2 + dy**2)
+            dist = np.sqrt(x**2 + dy**2)
             if dist > 0:
                 # Project to circle boundary
-                return cx + dx/dist * self.radius, center_y + dy/dist * self.radius
+                return x/dist * self.R, center_y + dy/dist * self.R
             else:
-                return cx, center_y + self.radius
+                return 0, center_y + self.R
+        
+        # Bottom semicircle
+        else:
+            center_y = -self.L/2
+            dy = y - center_y
+            dist = np.sqrt(x**2 + dy**2)
+            if dist > 0:
+                # Project to circle boundary
+                return x/dist * self.R, center_y + dy/dist * self.R
+            else:
+                return 0, center_y - self.R
     
     def get_gradient(self, x, y):
         """
-        Get gradient at position (simple linear gradient along y-axis).
+        Get gradient at position from vertical line source.
+        
+        The gradient emanates from a vertical line of length source_length
+        centered at the origin. The field decays with distance from the line.
         
         Returns:
         --------
@@ -122,19 +124,38 @@ class VerticalStadium:
         if not self.is_inside(x, y):
             return 0, 0
         
-        # Simple gradient pointing upward (along positive y)
-        # Strength decreases near the top
-        cy = self.center[1]
-        top_y = cy + self.rect_height/2 + self.radius
+        # Vertical line source from -source_length/2 to source_length/2
+        line_bottom = -self.source_length/2
+        line_top = self.source_length/2
         
-        # Normalize position
-        relative_y = (y - (cy - self.rect_height/2 - self.radius)) / self.height
+        # Find closest point on line source
+        if y < line_bottom:
+            # Below line source
+            closest_y = line_bottom
+            dx = x
+            dy = y - closest_y
+        elif y > line_top:
+            # Above line source
+            closest_y = line_top
+            dx = x
+            dy = y - closest_y
+        else:
+            # Beside line source (y is within line bounds)
+            closest_y = y
+            dx = x
+            dy = 0
         
-        # Gradient strength (weaker near top)
-        strength = self.gradient_strength * (1 - relative_y)
+        # Distance to line source
+        dist = np.sqrt(dx**2 + dy**2)
         
-        # Direction is always upward (π/2 radians)
-        direction = np.pi / 2
+        if dist < 0.1:  # Avoid division by zero
+            return 0, 0
+        
+        # Gradient strength decreases with distance
+        strength = self.gradient_strength * np.exp(-self.gradient_decay * dist)
+        
+        # Direction points away from line source
+        direction = np.arctan2(dy, dx)
         
         return strength, direction
     
@@ -156,55 +177,53 @@ class VerticalStadium:
         list : [(x, y)] positions
         """
         positions = []
-        cx, cy = self.center
         
         if distribution == 'bottom':
             # Start cells in bottom semicircle
-            center_y = cy - self.rect_height/2
             for _ in range(n_cells):
-                # Random point in circle
-                angle = np.random.uniform(0, 2*np.pi)
-                r = np.sqrt(np.random.uniform(0, 1)) * self.radius * 0.8  # 80% of radius
-                x = cx + r * np.cos(angle)
-                y = center_y + r * np.sin(angle) - self.radius * 0.5  # Bias toward bottom
+                # Random point in bottom semicircle
+                angle = np.random.uniform(np.pi, 2*np.pi)  # Bottom half
+                r = np.sqrt(np.random.uniform(0, 1)) * self.R * 0.8
+                x = r * np.cos(angle)
+                y = -self.L/2 + r * np.sin(angle)
                 positions.append((x, y))
                 
         elif distribution == 'uniform':
             # Uniform distribution throughout stadium
             attempts = 0
             while len(positions) < n_cells and attempts < n_cells * 100:
-                x = np.random.uniform(cx - self.radius, cx + self.radius)
-                y = np.random.uniform(cy - self.height/2, cy + self.height/2)
+                x = np.random.uniform(-self.R, self.R)
+                y = np.random.uniform(-self.L/2 - self.R, self.L/2 + self.R)
                 if self.is_inside(x, y):
                     positions.append((x, y))
                 attempts += 1
                 
         elif distribution == 'perimeter':
             # Distribute along perimeter
-            # Calculate perimeter
-            perimeter = 2 * self.rect_height + 2 * np.pi * self.radius
+            # Total perimeter = 2*L + 2*π*R
+            perimeter = 2 * self.L + 2 * np.pi * self.R
             
             for i in range(n_cells):
                 s = (i / n_cells) * perimeter
                 
-                if s < self.rect_height:
-                    # Left edge
-                    x = cx - self.radius
-                    y = cy - self.rect_height/2 + s
-                elif s < self.rect_height + np.pi * self.radius:
+                if s < self.L:
+                    # Right wall going up
+                    x = self.R
+                    y = -self.L/2 + s
+                elif s < self.L + np.pi * self.R:
                     # Top semicircle
-                    angle = np.pi + (s - self.rect_height) / self.radius
-                    x = cx + self.radius * np.cos(angle)
-                    y = cy + self.rect_height/2 + self.radius * np.sin(angle)
-                elif s < 2 * self.rect_height + np.pi * self.radius:
-                    # Right edge
-                    x = cx + self.radius
-                    y = cy + self.rect_height/2 - (s - self.rect_height - np.pi * self.radius)
+                    angle = (s - self.L) / self.R
+                    x = self.R * np.cos(angle)
+                    y = self.L/2 + self.R * np.sin(angle)
+                elif s < 2 * self.L + np.pi * self.R:
+                    # Left wall going down
+                    x = -self.R
+                    y = self.L/2 - (s - self.L - np.pi * self.R)
                 else:
                     # Bottom semicircle
-                    angle = (s - 2 * self.rect_height - np.pi * self.radius) / self.radius
-                    x = cx + self.radius * np.cos(angle)
-                    y = cy - self.rect_height/2 + self.radius * np.sin(angle)
+                    angle = np.pi + (s - 2 * self.L - np.pi * self.R) / self.R
+                    x = self.R * np.cos(angle)
+                    y = -self.L/2 + self.R * np.sin(angle)
                 
                 positions.append((x, y))
         
@@ -214,49 +233,67 @@ class VerticalStadium:
         """Visualize the stadium and optional cell positions."""
         fig, ax = plt.subplots(figsize=(6, 10))
         
-        cx, cy = self.center
+        # Draw stadium as a single closed polygon
+        verts = []
         
-        # Draw stadium outline
-        theta = np.linspace(0, 2*np.pi, 100)
+        # 1) Right wall from bottom to top
+        verts.append((self.R, -self.L/2))
+        verts.append((self.R, self.L/2))
         
-        # Bottom semicircle
-        bottom_y = cy - self.rect_height/2
-        x_bottom = cx + self.radius * np.cos(theta)
-        y_bottom = bottom_y + self.radius * np.sin(theta)
-        mask_bottom = y_bottom <= bottom_y
-        ax.plot(x_bottom[mask_bottom], y_bottom[mask_bottom], 'k-', linewidth=2)
+        # 2) Top semicircle (θ from 0 → π)
+        theta = np.linspace(0, np.pi, 50)
+        for t in theta:
+            x = self.R * np.cos(t)
+            y = self.L/2 + self.R * np.sin(t)
+            verts.append((x, y))
         
-        # Top semicircle
-        top_y = cy + self.rect_height/2
-        x_top = cx + self.radius * np.cos(theta)
-        y_top = top_y + self.radius * np.sin(theta)
-        mask_top = y_top >= top_y
-        ax.plot(x_top[mask_top], y_top[mask_top], 'k-', linewidth=2)
+        # 3) Left wall from top to bottom
+        verts.append((-self.R, self.L/2))
+        verts.append((-self.R, -self.L/2))
         
-        # Side edges
-        ax.plot([cx - self.radius, cx - self.radius], 
-                [bottom_y, top_y], 'k-', linewidth=2)
-        ax.plot([cx + self.radius, cx + self.radius], 
-                [bottom_y, top_y], 'k-', linewidth=2)
+        # 4) Bottom semicircle (θ from π → 2π)
+        theta = np.linspace(np.pi, 2*np.pi, 50)
+        for t in theta:
+            x = self.R * np.cos(t)
+            y = -self.L/2 + self.R * np.sin(t)
+            verts.append((x, y))
         
-        # Show gradient as arrow
-        arrow_y = np.linspace(cy - self.height/3, cy + self.height/3, 5)
-        for y in arrow_y:
-            ax.arrow(cx, y, 0, self.height/20, 
-                    head_width=self.radius/10, head_length=self.height/40,
-                    fc='red', ec='red', alpha=0.3)
+        # Create and add the polygon
+        stadium = Polygon(verts, closed=True, fill=False, 
+                         edgecolor='black', linewidth=2)
+        ax.add_patch(stadium)
+        
+        # Draw the gradient line source
+        ax.plot([0, 0], [-self.source_length/2, self.source_length/2], 
+                'r-', linewidth=3, label=f'Gradient source (L={self.source_length})')
+        
+        # Show gradient field with arrows
+        x_grid = np.linspace(-self.R*0.8, self.R*0.8, 7)
+        y_grid = np.linspace(-self.L/2, self.L/2, 10)
+        
+        for xi in x_grid:
+            for yi in y_grid:
+                if self.is_inside(xi, yi):
+                    strength, direction = self.get_gradient(xi, yi)
+                    if strength > 0.1:  # Only show significant gradients
+                        dx = strength * np.cos(direction) * 3
+                        dy = strength * np.sin(direction) * 3
+                        ax.arrow(xi, yi, dx, dy, 
+                                head_width=1, head_length=0.5,
+                                fc='blue', ec='blue', alpha=0.3)
         
         # Plot cells if provided
         if cells is not None:
             for cell in cells:
-                ax.scatter(cell.x, cell.y, s=50, c='blue', alpha=0.7)
+                ax.scatter(cell.x, cell.y, s=50, c='green', alpha=0.7, zorder=5)
         
-        ax.set_xlim(cx - self.radius * 1.2, cx + self.radius * 1.2)
-        ax.set_ylim(cy - self.height/2 * 1.1, cy + self.height/2 * 1.1)
+        ax.set_xlim(-self.R * 1.3, self.R * 1.3)
+        ax.set_ylim(-self.L/2 - self.R * 1.2, self.L/2 + self.R * 1.2)
         ax.set_aspect('equal')
         ax.set_xlabel('X (μm)')
         ax.set_ylabel('Y (μm)')
-        ax.set_title('Vertical Stadium Domain')
+        ax.set_title(f'Vertical Stadium (L={self.L}, R={self.R})')
+        ax.legend()
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()

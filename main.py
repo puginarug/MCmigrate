@@ -63,6 +63,7 @@ def run_example(experimental_data_path=None):
     
     print("="*60)
     print("SIMPLIFIED CELL MIGRATION SIMULATION")
+    print("Vertical Stadium with Line Source Gradient")
     print("="*60)
     
     # Load experimental data if provided
@@ -88,10 +89,16 @@ def run_example(experimental_data_path=None):
     
     # Create and run simulation
     print("\nInitializing simulation...")
+    print("Stadium parameters:")
+    print(f"  L (wall length): 60 μm")
+    print(f"  R (semicircle radius): 20 μm")
+    print(f"  Source length: 40 μm")
+    
     sim = Simulation(
         n_cells=30,
-        stadium_width=40,
-        stadium_height=100,
+        stadium_L=60,
+        stadium_R=20,
+        source_length=40,
         chemotaxis_strength=0.3,
         repulsion_strength=0.2,
         interaction_radius=10.0,
@@ -100,7 +107,7 @@ def run_example(experimental_data_path=None):
     )
     
     # Visualize initial state
-    print("Visualizing initial configuration...")
+    print("\nVisualizing initial configuration...")
     sim.stadium.visualize(sim.cells)
     
     # Run simulation
@@ -157,10 +164,12 @@ if __name__ == "__main__":
                        help='Number of cells (default: 30)')
     parser.add_argument('--n_steps', type=int, default=100,
                        help='Number of simulation steps (default: 100)')
-    parser.add_argument('--width', type=float, default=40,
-                       help='Stadium width (default: 40)')
-    parser.add_argument('--height', type=float, default=100,
-                       help='Stadium height (default: 100)')
+    parser.add_argument('--L', type=float, default=60,
+                       help='Stadium wall length (default: 60)')
+    parser.add_argument('--R', type=float, default=20,
+                       help='Stadium semicircle radius (default: 20)')
+    parser.add_argument('--source_length', type=float, default=40,
+                       help='Gradient source line length (default: 40)')
     parser.add_argument('--chemotaxis', type=float, default=0.3,
                        help='Chemotaxis strength 0-1 (default: 0.3)')
     parser.add_argument('--repulsion', type=float, default=0.2,
