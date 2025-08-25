@@ -1,3 +1,4 @@
+
 # Simplified Cell Migration Simulation
 
 A streamlined agent-based simulation for cell migration in a vertical stadium domain with Markov chain-based motion.
@@ -27,18 +28,24 @@ A streamlined agent-based simulation for cell migration in a vertical stadium do
 
 ### Basic Usage
 
+
 ```python
 from simulation import Simulation
 from visualization import plot_trajectories
 
-# Create simulation
+# Create simulation with cells randomly inside the stadium
 sim = Simulation(
     n_cells=30,
-    stadium_width=40,
-    stadium_height=100,
+    stadium_L=60,           # Length of straight walls
+    stadium_R=20,           # Radius of semicircles
+    source_length=40,       # Length of vertical line source for gradient
     chemotaxis_strength=0.3,
-    repulsion_strength=0.2
+    repulsion_strength=0.2,
+    initial_distribution='uniform'  # 'uniform' (inside), 'perimeter' (boundary), or 'bottom'
 )
+
+# Or, to start cells along the boundary:
+# sim = Simulation(..., initial_distribution='perimeter')
 
 # Run simulation
 sim.run(n_steps=100)
@@ -83,28 +90,17 @@ sim.run(n_steps=100)
 
 ## Parameters
 
+
 ### Simulation Parameters
 - `n_cells`: Number of cells (default: 30)
-- `stadium_width`: Width of vertical stadium (default: 40 μm)
-- `stadium_height`: Height of vertical stadium (default: 100 μm)
+- `stadium_L`: Length of straight walls in stadium (default: 60 μm)
+- `stadium_R`: Radius of semicircles (default: 20 μm)
+- `source_length`: Length of vertical line source for gradient (default: 40 μm)
 - `chemotaxis_strength`: Response to gradient, 0-1 (default: 0.3)
 - `repulsion_strength`: Cell-cell repulsion, 0-1 (default: 0.2)
 - `interaction_radius`: Range for repulsion (default: 10 μm)
+- `initial_distribution`: Where cells start: `'bottom'` (default, bottom semicircle), `'uniform'` (random inside stadium), or `'perimeter'` (random along boundary)
 
 ### Markov Chain Parameters
 - `B`: Number of angle bins (default: 12)
 - `n`: n-gram length (default: 3)
-
-## Analysis
-
-```python
-from analysis import calculate_dacf, calculate_msd
-
-# Get trajectory data
-df = sim.get_dataframe()
-
-# Calculate DACF
-dacf = calculate_dacf(df, max_lag=30)
-
-# Calculate MSD
-msd = calculate_msd(

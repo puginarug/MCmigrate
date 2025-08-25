@@ -1,65 +1,111 @@
-"""
-analysis.py
-Simple analysis functions for DACF and MSD
-"""
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def calculate_dacf(df, max_lag=None):
+def calculate_autocorrelation(df, max_lag=None, directional=True):
     """
-    Calculate Directional Autocorrelation Function.
+    Calculate velocity autocorrelation function.
     
     Parameters:
     -----------
     df : DataFrame
         Trajectory data with columns: track_id, step, v_x, v_y
-    max_lag : int
-        Maximum lag to calculate (None = all available)
-        
+    directional : bool
+        If True, compute directional autocorrelation (DACF)
+        If False, compute velocity autocorrelation (VACF)
+    
     Returns:
     --------
-    DataFrame with columns: lag, msd
+    DataFrame with autocorrelation values
+    """
+    # Pivot to wide format
+    df_vx = df.pivot(index='track_id', columns='step', values='v_x')
+    df_vy = df.pivot(index='track_id', columns='step', values='v_y')
+    Vx = df_vx.values
+    Vy = df_vy.values
+    
+    n_particles, n_steps = Vx.shape
+    acorr_vals = np.empty(n_steps, dtype=float)
+    
+    for dt in range(n_steps):
+        v1x = Vx[:, :n_steps-dt]
+        v2x = Vx[:, dt:]
+        v1y = Vy[:, :n_steps-dt]
+        v2y = Vy[:, dt:]
+        
+        dot = v1x*v2x + v1y*v2y
+        if max_lag is not None and dt >= max_lag:
+            break
+        if directional:
+            # Normalize by magnitudes for DACF
+            mag1 = np.sqrt(v1x**2 + v1y**2)
+            mag2 = np.sqrt(v2x**2 + v2y**2)
+            valid_mask = (mag1 > 0) & (mag2 > 0)
+            dot[valid_mask] /= (mag1[valid_mask] * mag2[valid_mask])
+            dot[~valid_mask] = np.nan
+            acorr_vals[dt] = np.nanmean(dot)
+            column_name = 'dacf'
+        else:
+            # VACF without normalization
+            acorr_vals[dt] = np.nanmean(dot)
+            column_name = 'vacf'
+    
+    acorr_df = pd.DataFrame(acorr_vals, columns=[column_name])
+    acorr_df['lag'] = np.arange(n_steps)
+    acorr_df['dt'] = acorr_df['lag'] * 10  # Convert to minutes
+    
+    return acorr_df
+
+
+def calculate_msd(df, max_lag=None):
+    """
+    Calculate Mean Squared Displacement.
+    
+    Parameters:
+    -----------
+    df : DataFrame
+        Trajectory data with columns: track_id, step, x, y
+    max_lag : int, optional
+        Maximum lag to compute MSD for
+    
+    Returns:
+    --------
+    DataFrame with MSD values
     """
     tracks = df.groupby('track_id')
-    
-    # Find maximum possible lag
-    min_track_length = df.groupby('track_id').size().min()
+    n_steps = df.groupby('track_id').size().max()
     
     if max_lag is None:
-        max_lag = min_track_length - 1
+        max_lag = n_steps - 1
     else:
-        max_lag = min(max_lag, min_track_length - 1)
+        max_lag = min(max_lag, n_steps - 1)
     
-    msd_values = []
+    msd_values = np.zeros(max_lag)
+    counts = np.zeros(max_lag)
     
-    for lag in range(max_lag + 1):
-        if lag == 0:
-            msd_values.append(0)
-        else:
-            displacements = []
-            
-            for track_id, track in tracks:
-                x = track['x'].values
-                y = track['y'].values
-                
-                # Calculate displacements for this lag
-                for i in range(len(x) - lag):
-                    dx = x[i + lag] - x[i]
-                    dy = y[i + lag] - y[i]
-                    displacements.append(dx**2 + dy**2)
-            
-            if displacements:
-                msd_values.append(np.mean(displacements))
-            else:
-                msd_values.append(0)
+    for track_id, track in tracks:
+        x = track['x'].values
+        y = track['y'].values
+        n = len(x)
+        
+        for lag in range(1, min(n, max_lag + 1)):
+            dx = x[lag:] - x[:-lag]
+            dy = y[lag:] - y[:-lag]
+            squared_disp = dx**2 + dy**2
+            msd_values[lag-1] += np.sum(squared_disp)
+            counts[lag-1] += len(squared_disp)
     
-    return pd.DataFrame({
-        'lag': range(max_lag + 1),
-        'msd': msd_values
+    # Average over all windows and tracks
+    msd_values = msd_values / (counts + 1e-10)
+    
+    msd_df = pd.DataFrame({
+        'msd': msd_values,
+        'lag': np.arange(1, max_lag + 1),
+        'dt': np.arange(1, max_lag + 1) * 10  # Convert to minutes
     })
+    
+    return msd_df
 
 
 def plot_dacf(dacf_df, title='Directional Autocorrelation Function'):
@@ -128,12 +174,12 @@ def compare_simulations(sim_df, exp_df=None, max_lag=30):
         Maximum lag for analysis
     """
     # Calculate metrics for simulation
-    sim_dacf = calculate_dacf(sim_df, max_lag)
+    sim_dacf = calculate_autocorrelation(sim_df, max_lag, directional=True)
     sim_msd = calculate_msd(sim_df, max_lag)
     
     if exp_df is not None:
         # Calculate metrics for experimental data
-        exp_dacf = calculate_dacf(exp_df, max_lag)
+        exp_dacf = calculate_autocorrelation(exp_df, max_lag, directional=True)
         exp_msd = calculate_msd(exp_df, max_lag)
         
         # Create comparison plots
@@ -174,72 +220,4 @@ def compare_simulations(sim_df, exp_df=None, max_lag=30):
         return {
             'sim_dacf': sim_dacf,
             'sim_msd': sim_msd
-        }
-    Returns:
-    --------
-    DataFrame with columns: lag, dacf
-    """
-    # Pivot data to wide format
-    vx_pivot = df.pivot(index='track_id', columns='step', values='v_x')
-    vy_pivot = df.pivot(index='track_id', columns='step', values='v_y')
-    
-    vx = vx_pivot.values
-    vy = vy_pivot.values
-    
-    n_cells, n_steps = vx.shape
-    
-    if max_lag is None:
-        max_lag = n_steps - 1
-    else:
-        max_lag = min(max_lag, n_steps - 1)
-    
-    dacf_values = []
-    
-    for lag in range(max_lag + 1):
-        # Calculate dot products for this lag
-        if lag == 0:
-            # Autocorrelation at lag 0 is always 1
-            dacf_values.append(1.0)
-        else:
-            dot_products = []
-            
-            for i in range(n_steps - lag):
-                # Velocity at time t
-                v1_x = vx[:, i]
-                v1_y = vy[:, i]
-                
-                # Velocity at time t + lag
-                v2_x = vx[:, i + lag]
-                v2_y = vy[:, i + lag]
-                
-                # Calculate normalized dot product for each cell
-                for j in range(n_cells):
-                    mag1 = np.sqrt(v1_x[j]**2 + v1_y[j]**2)
-                    mag2 = np.sqrt(v2_x[j]**2 + v2_y[j]**2)
-                    
-                    if mag1 > 0 and mag2 > 0:
-                        dot = (v1_x[j] * v2_x[j] + v1_y[j] * v2_y[j]) / (mag1 * mag2)
-                        dot_products.append(dot)
-            
-            if dot_products:
-                dacf_values.append(np.mean(dot_products))
-            else:
-                dacf_values.append(0)
-    
-    return pd.DataFrame({
-        'lag': range(max_lag + 1),
-        'dacf': dacf_values
-    })
-
-
-def calculate_msd(df, max_lag=None):
-    """
-    Calculate Mean Squared Displacement.
-    
-    Parameters:
-    -----------
-    df : DataFrame
-        Trajectory data with columns: track_id, step, x, y
-    max_lag : int
-        Maximum lag to calculate (None = all available)
-        
+        }   

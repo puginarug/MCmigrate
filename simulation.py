@@ -22,7 +22,8 @@ class Simulation:
                  repulsion_strength=0.2,
                  interaction_radius=10.0,
                  velocity_params=None,
-                 markov_chain=None):
+                 markov_chain=None,
+                 initial_distribution='perimeter'):
         """
         Initialize simulation.
         
@@ -46,6 +47,8 @@ class Simulation:
             Parameters for velocity distribution
         markov_chain : MarkovChain
             Fitted Markov chain for angle changes
+        initial_distribution : str
+            Where cells start: 'bottom', 'uniform' (inside), or 'perimeter' (boundary)
         """
         self.n_cells = n_cells
         self.chemotaxis_strength = chemotaxis_strength
@@ -62,7 +65,7 @@ class Simulation:
                                       center=(0, 0), source_length=source_length)
         
         # Initialize cells
-        positions = self.stadium.sample_initial_positions(n_cells, distribution='bottom')
+        positions = self.stadium.sample_initial_positions(n_cells, distribution=initial_distribution)
         self.cells = []
         for i, (x, y) in enumerate(positions):
             self.cells.append(Cell(i, x, y, velocity_params))
