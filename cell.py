@@ -107,6 +107,7 @@ class Cell:
                        chemotaxis_strength=0.3, repulsion_strength=0.2):
         """
         Update cell position based on various inputs.
+        This is the main method that performs one step of cell movement.
         
         Parameters:
         -----------
@@ -120,16 +121,20 @@ class Cell:
             Weight for chemotaxis (0-1)
         repulsion_strength : float
             Weight for repulsion (0-1)
+            
+        Returns:
+        --------
+        tuple : (new_x, new_y) - the new position before boundary checking
         """
-        # Update orientation
+        # Update orientation by combining all angle changes
         self.theta += angle_change
         self.theta += chemotaxis_strength * chemotaxis_bias
         self.theta += repulsion_strength * repulsion_bias
         
-        # Normalize angle
+        # Normalize angle to [-π, π]
         self.theta = np.arctan2(np.sin(self.theta), np.cos(self.theta))
         
-        # Sample velocity
+        # Sample velocity from log-normal distribution
         velocity = lognorm.rvs(
             self.velocity_params['shape'],
             self.velocity_params['loc'],
@@ -140,8 +145,23 @@ class Cell:
         dx = velocity * np.cos(self.theta)
         dy = velocity * np.sin(self.theta)
         
-        self.x += dx
-        self.y += dy
+        new_x = self.x + dx
+        new_y = self.y + dy
+        
+        # Return the new position (will be checked for boundaries in simulation)
+        return new_x, new_y
+    
+    def set_position(self, x, y):
+        """
+        Set the cell's position after boundary checking and record history.
+        
+        Parameters:
+        -----------
+        x, y : float
+            Final position after boundary checking
+        """
+        self.x = x
+        self.y = y
         
         # Store history
         self.x_history.append(self.x)

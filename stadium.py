@@ -150,13 +150,22 @@ class VerticalStadium:
         
         if dist < 0.1:  # Avoid division by zero
             return 0, 0
-        
+
+        # normalize distance to [-1, 1]
+        norm_dist = dist / (self.R + self.L/2)
+        norm_dist = np.clip(norm_dist, -1, 1)
+
+        # Evaluate the 4th-degree polynomial
+        polynomial_coefficients = [9.77156799e-01, -1.27160505e-16, -1.93457460e+00, 
+                                -2.25204704e-17, 9.88800428e-01]
+        polynomial_value = np.polyval(polynomial_coefficients, norm_dist)
+
         # Gradient strength decreases with distance
-        strength = self.gradient_strength * np.exp(-self.gradient_decay * dist)
-        
-        # Direction points away from line source
-        direction = np.arctan2(dy, dx)
-        
+        strength = self.gradient_strength * polynomial_value
+
+        # Direction points towards line source
+        direction = np.arctan2(-dy, -dx)
+
         return strength, direction
     
     def sample_initial_positions(self, n_cells, distribution='bottom'):

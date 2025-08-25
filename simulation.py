@@ -23,7 +23,7 @@ class Simulation:
                  interaction_radius=10.0,
                  velocity_params=None,
                  markov_chain=None,
-                 initial_distribution='perimeter'):
+                 starting_positions='perimeter'):
         """
         Initialize simulation.
         
@@ -47,8 +47,8 @@ class Simulation:
             Parameters for velocity distribution
         markov_chain : MarkovChain
             Fitted Markov chain for angle changes
-        initial_distribution : str
-            Where cells start: 'bottom', 'uniform' (inside), or 'perimeter' (boundary)
+        starting_positions : str
+            Initial positions distribution for cells: 'perimeter' or 'uniform'
         """
         self.n_cells = n_cells
         self.chemotaxis_strength = chemotaxis_strength
@@ -65,7 +65,7 @@ class Simulation:
                                       center=(0, 0), source_length=source_length)
         
         # Initialize cells
-        positions = self.stadium.sample_initial_positions(n_cells, distribution=initial_distribution)
+        positions = self.stadium.sample_initial_positions(n_cells, distribution=starting_positions)
         self.cells = []
         for i, (x, y) in enumerate(positions):
             self.cells.append(Cell(i, x, y, velocity_params))
@@ -88,10 +88,15 @@ class Simulation:
         
         for cell in self.cells:
             # 1. Get angle change from Markov chain
-            if self.markov_chain is not None and cell.id in self.markov_states:
-                angle_change = self.markov_chain.sample_angle_change(self.markov_states[cell.id])
-                # Update state (simplified - just use random state)
-                self.markov_states[cell.id] = self.markov_chain.get_random_state()
+            if self.markov_chain is not None:
+                current_state = self.markov_states.get(cell.id)
+                
+                # Get next state (this maintains the Markov sequence)
+                next_state = self.markov_chain.get_next_state(current_state)
+                self.markov_states[cell.id] = next_state
+                
+                # Convert state to angle change
+                angle_change = self.markov_chain.state_to_angle_change(next_state)
             else:
                 # Random walk if no Markov chain
                 angle_change = np.random.normal(0, 0.3)
@@ -103,8 +108,8 @@ class Simulation:
             # 3. Calculate repulsion bias
             repulsion_bias = cell.calculate_repulsion(self.cells, self.interaction_radius)
             
-            # 4. Update cell position
-            cell.update_position(
+            # 4. Update cell position (returns new position before boundary check)
+            new_x, new_y = cell.update_position(
                 angle_change, 
                 chemotaxis_bias, 
                 repulsion_bias,
@@ -113,11 +118,10 @@ class Simulation:
             )
             
             # 5. Apply boundary conditions
-            cell.x, cell.y = self.stadium.apply_boundary(cell.x, cell.y)
+            bounded_x, bounded_y = self.stadium.apply_boundary(new_x, new_y)
             
-            # Update last position in history if boundary was hit
-            cell.x_history[-1] = cell.x
-            cell.y_history[-1] = cell.y
+            # 6. Set the final position
+            cell.set_position(bounded_x, bounded_y)
         
         self.time += self.time_step
     

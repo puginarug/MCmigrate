@@ -14,6 +14,8 @@ class MarkovChain:
     def __init__(self):
         self.transitions = defaultdict(Counter)
         self.states = set()
+        self.B = 12  # Default bins
+        self.n = 3   # Default n-gram length
         
     def fit(self, tracks, B=12, n=3):
         """
@@ -98,9 +100,9 @@ class MarkovChain:
         
         return ngram_sequences
     
-    def sample_angle_change(self, current_state=None):
+    def get_next_state(self, current_state):
         """
-        Sample next angle change from Markov chain.
+        Get next state based on current state using transition probabilities.
         
         Parameters:
         -----------
@@ -109,30 +111,48 @@ class MarkovChain:
             
         Returns:
         --------
+        str : Next state
+        """
+        if not current_state or current_state not in self.transitions:
+            # No valid state, return random
+            if self.states:
+                return random.choice(list(self.states))
+            return None
+            
+        # Get transition probabilities
+        possible_states = self.transitions[current_state]
+        if not possible_states:
+            return random.choice(list(self.states)) if self.states else None
+            
+        # Sample next state based on weights
+        next_states = list(possible_states.keys())
+        weights = list(possible_states.values())
+        return random.choices(next_states, weights=weights)[0]
+    
+    def state_to_angle_change(self, state):
+        """
+        Convert n-gram state to angle change.
+        
+        Parameters:
+        -----------
+        state : str
+            n-gram state (e.g., "3_5_7")
+            
+        Returns:
+        --------
         float : Angle change in radians
         """
-        # If no state or state not in transitions, pick random
-        if current_state is None or current_state not in self.transitions:
-            if self.states:
-                current_state = random.choice(list(self.states))
-            else:
-                # Random angle change if no Markov chain fitted
-                return np.random.normal(0, 0.3)
+        if not state:
+            return np.random.normal(0, 0.3)
+            
+        # Extract the last bin from the n-gram
+        try:
+            bin_idx = int(state.split('_')[-1])
+        except:
+            return np.random.normal(0, 0.3)
         
-        # Get next state based on transitions
-        if self.transitions[current_state]:
-            next_states = list(self.transitions[current_state].keys())
-            weights = list(self.transitions[current_state].values())
-            next_state = random.choices(next_states, weights=weights)[0]
-        else:
-            next_state = random.choice(list(self.states))
-        
-        # Extract bin index from state
-        bin_idx = int(next_state.split('_')[-1])
-        
-        # Convert bin to angle
+        # Convert bin to angle (center of bin)
         centers = (np.arange(self.B) + 0.5) * 2 * np.pi / self.B - np.pi
-        
         return centers[bin_idx]
     
     def get_random_state(self):

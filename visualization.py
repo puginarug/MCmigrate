@@ -107,7 +107,7 @@ def plot_trajectories(simulation, show_gradient=True):
     ax.set_xlabel('X (μm)', fontsize=12)
     ax.set_ylabel('Y (μm)', fontsize=12)
     ax.set_title(f'Cell Migration Trajectories (L={stadium.L}, R={stadium.R})', fontsize=14)
-    ax.grid(True, alpha=0.3)
+    ax.grid(False)
     
     plt.tight_layout()
     plt.show()
@@ -194,7 +194,6 @@ def create_animation(simulation, interval=100, save_path=None):
     ax.set_xlabel('X (μm)', fontsize=12)
     ax.set_ylabel('Y (μm)', fontsize=12)
     ax.set_title('Cell Migration Animation', fontsize=14)
-    ax.grid(True, alpha=0.3)
     
     def init():
         cell_points.set_offsets(np.empty((0, 2)))
@@ -255,10 +254,12 @@ def plot_cell_statistics(simulation):
     df = simulation.get_dataframe()
     stadium = simulation.stadium
     
-    # 1. MSD
+    # 1. MSD (scatter plot)
     msd = calculate_msd(df, max_lag=None)
     ax = axes[0, 0]
-    ax.plot(msd['lag'], msd['msd'], linewidth=2)
+    ax.scatter(msd['lag'], msd['msd'], s=20)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
     ax.set_xlabel('Time Lag (steps)')
     ax.set_ylabel('MSD (μm²)')
     ax.set_title('Mean Squared Displacement')
@@ -274,10 +275,12 @@ def plot_cell_statistics(simulation):
     ax.set_title('Velocity Distribution')
     ax.grid(True, alpha=0.3)
     
-    # 3. DACF
+    # 3. DACF (scatter plot)
     dacf = calculate_autocorrelation(df, max_lag=None, directional=True)
     ax = axes[1, 0]
-    ax.loglog(dacf.index, dacf.values, linewidth=2)
+    ax.scatter(dacf['lag'], dacf['dacf'], s=20)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
     ax.set_xlabel('Time Lag')
     ax.set_ylabel('DACF')
     ax.set_title('Directional Autocorrelation Function')
@@ -287,7 +290,8 @@ def plot_cell_statistics(simulation):
     ax = axes[1, 1]
     for cell in simulation.cells:
         ax.scatter(cell.x_history[0], cell.y_history[0], 
-                  s=50, alpha=0.6, label='Initial' if cell.id == 0 else "")
+                  s=50, alpha=0.6, color='blue', label='Initial' if cell.id == 0 else "")
         ax.scatter(cell.x_history[-1], cell.y_history[-1], 
-                  s=50, alpha=0.6, label='Final' if cell.id == 0 else "")
+                  s=50, alpha=0.6, color='red', label='Final' if cell.id == 0 else "")
+    ax.set_aspect('equal')
     ax.legend()

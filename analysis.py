@@ -185,18 +185,22 @@ def compare_simulations(sim_df, exp_df=None, max_lag=30):
         # Create comparison plots
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
         
-        # DACF comparison
-        ax1.plot(exp_dacf['lag'], exp_dacf['dacf'], 'o-', label='Experimental', alpha=0.7)
-        ax1.plot(sim_dacf['lag'], sim_dacf['dacf'], 's-', label='Simulation', alpha=0.7)
+        # DACF comparison (scatter plots)
+        ax1.scatter(exp_dacf['lag'], exp_dacf['dacf'], marker='o', label='Experimental', alpha=0.7)
+        ax1.scatter(sim_dacf['lag'], sim_dacf['dacf'], marker='s', label='Simulation', alpha=0.7)
+        ax1.set_xscale('log')
+        ax1.set_yscale('log')
         ax1.set_xlabel('Time Lag (steps)')
         ax1.set_ylabel('DACF')
         ax1.set_title('Directional Autocorrelation Comparison')
         ax1.legend()
         ax1.grid(True, alpha=0.3)
         
-        # MSD comparison
-        ax2.loglog(exp_msd['lag'][1:], exp_msd['msd'][1:], 'o-', label='Experimental', alpha=0.7)
-        ax2.loglog(sim_msd['lag'][1:], sim_msd['msd'][1:], 's-', label='Simulation', alpha=0.7)
+        # MSD comparison (scatter plots)
+        ax2.scatter(exp_msd['lag'][1:], exp_msd['msd'][1:], marker='o', label='Experimental', alpha=0.7)
+        ax2.scatter(sim_msd['lag'][1:], sim_msd['msd'][1:], marker='s', label='Simulation', alpha=0.7)
+        ax2.set_xscale('log')
+        ax2.set_yscale('log')
         ax2.set_xlabel('Time Lag (steps)')
         ax2.set_ylabel('MSD (μm²)')
         ax2.set_title('Mean Squared Displacement Comparison')
@@ -213,7 +217,7 @@ def compare_simulations(sim_df, exp_df=None, max_lag=30):
             'exp_msd': exp_msd
         }
     else:
-        # Just plot simulation results
+        # Plot simulation results
         plot_dacf(sim_dacf, 'Simulation DACF')
         plot_msd(sim_msd, 'Simulation MSD')
         
