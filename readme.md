@@ -1,4 +1,4 @@
-# Simplified Cell Migration Simulation
+# Markov Chain-Based Cell Migration Simulation
 
 A streamlined agent-based simulation for cell migration in a vertical stadium domain with Markov chain-based motion.
 
